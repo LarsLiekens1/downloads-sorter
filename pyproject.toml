@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "downloads-sorter"
+version = "2.0.0"
+description = "Sort and clean your Downloads, Documents and Pictures folders from the terminal."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = ["rich>=13.0", "send2trash>=1.8"]
+
+[project.urls]
+Homepage = "https://github.com/Larsliekens1/downloads-sorter"
+
+[project.scripts]
+downloads-sorter = "downloads_sorter:main"
+
+[tool.setuptools]
+py-modules = ["downloads_sorter"]
