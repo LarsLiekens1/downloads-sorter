@@ -1,7 +1,7 @@
 # Downloads Sorter 🧹
 
-A small CLI tool that sorts your Downloads folder into folders by file type,
-with a colorful terminal UI.
+A small CLI tool that sorts and cleans your personal folders (Downloads, Desktop,
+Documents, Pictures, Videos, Music) from the terminal, with a colorful UI.
 
 ```
  ____   ___  ____ _____ _____ ____
@@ -15,14 +15,29 @@ with a colorful terminal UI.
 
 ## Features
 
-- Sorts files into `Images`, `Audio`, `Video`, `Documents`, `Code`, ... by extension
-- Dry-run mode to preview before moving anything
+- Sorts loose files into `Images`, `Audio`, `Video`, `Documents`, `Code`, ... by extension
+- `--all`: works on all your personal folders at once
+- `--by-date`: sorts into `Category/YYYY/MM` subfolders
+- `--duplicates`: finds identical files (size, then SHA-256) and trashes the extra copies
+- `--older-than DAYS`: trashes files you have not touched for a long time
+- `--top N`: shows the largest files
+- Dry-run mode to preview before changing anything
+- Undo the last sort with one command
 - Never overwrites: duplicates become `file (1).png`
-- Skips folders, hidden files, Windows system files (`desktop.ini`) and unfinished downloads (`.crdownload`, `.part`)
-- Undo the last run with one command
+- Deletes only to the trash, always with confirmation
 - Custom categories via a JSON config
 - One-click start scripts for Windows and Mac/Linux
-- Works on Windows, macOS and Linux
+
+## Safety
+
+- Refuses drive roots, your home folder itself and system folders (Windows, Program Files, AppData, ...)
+- Only sorts loose files at the top of a folder, existing subfolders stay untouched
+- Skips hidden folders, shortcuts (`.lnk`) and `desktop.ini`
+- Skips software projects (folders with `.git`, `package.json`, `pyproject.toml`, ...), virtual environments and game data such as `My Games`
+- Never downloads OneDrive "online only" files when looking for duplicates
+- `--older-than` cannot be combined with `--all`
+
+Always run with `--dry-run` first.
 
 ## Quick start
 
@@ -36,15 +51,13 @@ Requirements: Python 3.10+ (on Windows tick "Add python.exe to PATH" during inst
    - **Windows:** double-click `start.bat`
    - **Mac/Linux:** run `./start.sh` in a terminal
 
-The first run sets up everything automatically (virtual environment and dependencies).
-After that you get a menu: preview, sort or undo.
+The first run sets up everything automatically. After that you get a menu with
+preview, sort, undo, duplicates, old files and largest files.
 
 > Windows may show a blue SmartScreen warning for downloaded `.bat` files.
 > Click **More info**, then **Run anyway**.
 
 ## Command line usage
-
-Prefer the terminal? Set it up manually:
 
 ```bash
 git clone https://github.com/Larsliekens1/downloads-sorter.git
@@ -55,14 +68,16 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-Then run:
-
 ```bash
-python downloads_sorter.py --dry-run     # preview only
-python downloads_sorter.py               # sort ~/Downloads
-python downloads_sorter.py ~/Desktop     # sort another folder
-python downloads_sorter.py --undo        # undo the last run
-python downloads_sorter.py -c config.json
+python downloads_sorter.py --dry-run                 # preview sorting ~/Downloads
+python downloads_sorter.py                           # sort ~/Downloads
+python downloads_sorter.py --all --dry-run           # preview all personal folders
+python downloads_sorter.py --all --by-date           # sort into Category/YYYY/MM
+python downloads_sorter.py --all --duplicates        # find and trash duplicates
+python downloads_sorter.py --older-than 30           # trash old files in Downloads
+python downloads_sorter.py --all --top 20            # 20 largest files
+python downloads_sorter.py ~/Desktop ~/Pictures      # specific folders
+python downloads_sorter.py --undo                    # undo the last sort
 python downloads_sorter.py --help
 ```
 
@@ -71,6 +86,28 @@ If PowerShell blocks the activation script, run this first (only affects the cur
 ```powershell
 Set-ExecutionPolicy -Scope Process RemoteSigned
 ```
+
+### Install as a real command
+
+```bash
+pip install -e .
+downloads-sorter --all --dry-run
+```
+
+## Options
+
+| Option | Description |
+| --- | --- |
+| `folders` | Folders to process (default: `~/Downloads`) |
+| `-a`, `--all` | Downloads, Desktop, Documents, Pictures, Videos, Music (+ OneDrive versions) |
+| `-n`, `--dry-run` | Only show what would happen |
+| `-u`, `--undo` | Undo the last sorting run |
+| `--by-date` | Sort into `Category/YYYY/MM` |
+| `--duplicates` | Find duplicates, trash extra copies (oldest is kept) |
+| `--older-than DAYS` | Trash files not modified for DAYS days |
+| `--top N` | Show the N largest files |
+| `-c`, `--config` | JSON file with custom categories |
+| `-y`, `--yes` | Do not ask for confirmation |
 
 ## Default categories
 
@@ -89,7 +126,7 @@ Set-ExecutionPolicy -Scope Process RemoteSigned
 
 ## Custom categories
 
-Create a `config.json`:
+`config.json`:
 
 ```json
 {
@@ -99,19 +136,15 @@ Create a `config.json`:
 }
 ```
 
-Run it with:
-
 ```bash
 python downloads_sorter.py -c config.json
 ```
 
-Files that match no category go to `Other`.
-
 ## Undo
 
-Every run saves a history file (`~/.downloads_sorter_history.json`).
-`--undo` moves the files of the last run back and removes the empty category folders.
-Only the most recent run can be undone.
+Every sort saves a history file (`~/.downloads_sorter_history.json`).
+`--undo` moves the files of the last sort back and removes the empty folders it created.
+Only the most recent sort can be undone. Files sent to the trash can be restored from the Recycle Bin / Trash.
 
 ## Development
 
@@ -120,7 +153,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-Tests run automatically on every push through GitHub Actions (Ubuntu and Windows, Python 3.10 and 3.12).
+Tests run on every push through GitHub Actions (Ubuntu and Windows, Python 3.10 and 3.12).
 
 ## Project structure
 
@@ -129,6 +162,7 @@ downloads-sorter/
 ├── downloads_sorter.py
 ├── start.bat
 ├── start.sh
+├── pyproject.toml
 ├── tests/
 │   └── test_sorter.py
 ├── .github/workflows/tests.yml
