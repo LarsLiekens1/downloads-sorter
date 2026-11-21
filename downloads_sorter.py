@@ -25,12 +25,13 @@ try:
 except ImportError:  # reported when trashing is needed
     send2trash = None
 
-__version__ = "2.0.1"
+__version__ = "2.1.0"
 
 console = Console()
 
 HISTORY_FILE = Path.home() / ".downloads_sorter_history.json"
 MAX_SHOWN = 30
+MAX_DEPTH = 5
 
 BANNER = r"""
  ____   ___  ____ _____ _____ ____
@@ -166,6 +167,15 @@ def is_cloud_placeholder(st: os.stat_result) -> bool:
     return bool(attrs & 0x400000 or attrs & 0x40000)
 
 
+def is_project_dir(path: Path) -> bool:
+    """True for software projects (.git, package.json, pyproject.toml, ...)."""
+    try:
+        names = {entry.name.lower() for entry in path.iterdir()}
+    except OSError:
+        return False
+    return ".git" in names or bool(names & PROJECT_MARKERS)
+
+
 # --------------------------------------------------------------------------
 # Sorting
 # --------------------------------------------------------------------------
@@ -199,6 +209,33 @@ def unique_destination(dest: Path) -> Path:
         if not candidate.exists():
             return candidate
         counter += 1
+
+
+def sort_folders(root: Path, categories: dict[str, set[str]], depth: int):
+    """Yield `root` and the subfolders (up to `depth` levels) that are safe to sort in place.
+
+    Skips category folders (Images, Other, ...), hidden folders, game/system data,
+    links and software projects.
+    """
+    yield root
+    if depth <= 0:
+        return
+    skip = {name.lower() for name in categories} | {"other"}
+    try:
+        children = sorted(p for p in root.iterdir() if p.is_dir())
+    except OSError:
+        return
+    for child in children:
+        name = child.name.lower()
+        if (
+            name in skip
+            or name in SKIP_DIR_NAMES
+            or name.startswith(".")
+            or is_link_or_junction(child)
+            or is_project_dir(child)
+        ):
+            continue
+        yield from sort_folders(child, categories, depth - 1)
 
 
 def plan_moves(
@@ -401,12 +438,14 @@ def run_sort(
     categories: dict[str, set[str]],
     dry_run: bool,
     by_date: bool,
+    depth: int,
     ask: bool,
     assume_yes: bool,
 ) -> None:
     moves: list[tuple[Path, Path]] = []
     for folder in folders:
-        moves.extend(plan_moves(folder, categories, by_date))
+        for target in sort_folders(folder, categories, depth):
+            moves.extend(plan_moves(target, categories, by_date))
 
     if not moves:
         console.print("[bold green]✨ Already clean, nothing to do![/bold green]")
@@ -415,12 +454,14 @@ def run_sort(
     console.print(f"📂 {len(moves)} file(s) found in {len(folders)} folder(s)\n")
 
     if dry_run:
-        for src, dest in moves:
+        for src, dest in moves[:200]:
             rel = dest.parent.relative_to(src.parent).as_posix()
             console.print(
                 f"[dim]{escape(src.name)}[/dim] [cyan]→[/cyan] "
                 f"[bold]{escape(src.parent.name)}/{escape(rel)}/[/bold]"
             )
+        if len(moves) > 200:
+            console.print(f"[dim]... and {len(moves) - 200} more file(s)[/dim]")
         console.print()
         print_summary(moves, categories, dry_run=True)
         return
@@ -567,6 +608,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("-u", "--undo", action="store_true", help="undo the last sorting run")
     parser.add_argument("-c", "--config", help="JSON file with custom categories")
     parser.add_argument("--by-date", action="store_true", help="sort into Category/YYYY/MM subfolders")
+    parser.add_argument(
+        "--depth", type=int, default=0, metavar="N",
+        help=f"also sort subfolders up to N levels deep, each in place (max {MAX_DEPTH}, default 0)",
+    )
     parser.add_argument("--duplicates", action="store_true", help="find duplicate files and trash the extra copies")
     parser.add_argument("--older-than", type=int, metavar="DAYS", help="trash files not modified for DAYS days")
     parser.add_argument("--top", type=int, metavar="N", help="show the N largest files")
@@ -608,6 +653,10 @@ def main(argv: list[str] | None = None) -> int:
             console.print("[yellow]Nothing to undo.[/yellow]")
         return 0
 
+    if not 0 <= args.depth <= MAX_DEPTH:
+        console.print(f"[bold red]--depth must be between 0 and {MAX_DEPTH}.[/bold red]")
+        return 1
+
     if args.older_than is not None:
         if args.all:
             console.print("[bold red]--older-than cannot be combined with --all.[/bold red] Pass a specific folder instead.")
@@ -623,13 +672,14 @@ def main(argv: list[str] | None = None) -> int:
     console.print("📂 Folders: " + ", ".join(escape(str(f)) for f in folders) + "\n")
 
     wants_action = args.duplicates or args.older_than is not None or args.top
-    if args.by_date or not wants_action:
+    if args.by_date or args.depth or not wants_action:
         run_sort(
             folders,
             load_categories(args.config),
             dry_run=args.dry_run,
             by_date=args.by_date,
-            ask=args.all,
+            depth=args.depth,
+            ask=args.all or args.depth > 0,
             assume_yes=args.yes,
         )
     if args.duplicates:

@@ -27,6 +27,7 @@ Documents, Pictures, Videos, Music) from the terminal, with a colorful UI.
 - Deletes only to the trash, always with confirmation
 - Custom categories via a JSON config
 - One-click start scripts for Windows and Mac/Linux
+- `--depth N`: also sorts subfolders up to N levels deep, each folder in place
 
 ## Safety
 
@@ -59,6 +60,7 @@ preview, sort, undo, duplicates, old files and largest files.
 
 ## Command line usage
 
+
 ```bash
 git clone https://github.com/Larsliekens1/downloads-sorter.git
 cd downloads-sorter
@@ -79,6 +81,7 @@ python downloads_sorter.py --all --top 20            # 20 largest files
 python downloads_sorter.py ~/Desktop ~/Pictures      # specific folders
 python downloads_sorter.py --undo                    # undo the last sort
 python downloads_sorter.py --help
+python downloads_sorter.py --all --depth 1 --dry-run   # also sort one level of subfolders
 ```
 
 If PowerShell blocks the activation script, run this first (only affects the current window):
