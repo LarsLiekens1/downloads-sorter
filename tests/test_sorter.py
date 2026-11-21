@@ -153,3 +153,25 @@ def test_scan_skips_game_data_and_project_folders(tmp_path):
     make(tmp_path / "repo" / "main.py")
     make(tmp_path / "keep" / "ok.txt")
     assert [path.name for path, _ in ds.scan([tmp_path])] == ["ok.txt"]
+
+
+
+
+def test_user_folders_finds_dutch_names(tmp_path, monkeypatch):
+    monkeypatch.setattr(ds.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(ds, "windows_known_folders", lambda: [])
+    for name in ("Bureaublad", "Documenten", "Afbeeldingen", "Downloads", "Random"):
+        (tmp_path / name).mkdir()
+    found = {folder.name for folder in ds.user_folders()}
+    assert found == {"Bureaublad", "Documenten", "Afbeeldingen", "Downloads"}
+
+
+def test_user_folders_has_no_duplicates(tmp_path, monkeypatch):
+    monkeypatch.setattr(ds.Path, "home", classmethod(lambda cls: tmp_path))
+    (tmp_path / "Bureaublad").mkdir()
+    monkeypatch.setattr(ds, "windows_known_folders", lambda: [tmp_path / "Bureaublad"])
+    assert len(ds.user_folders()) == 1
+
+
+def test_windows_known_folders_does_not_crash():
+    assert all(isinstance(path, Path) for path in ds.windows_known_folders())

@@ -12,6 +12,7 @@ import time
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
+from uuid import UUID
 
 from rich.console import Console
 from rich.markup import escape
@@ -25,7 +26,7 @@ try:
 except ImportError:  # reported when trashing is needed
     send2trash = None
 
-__version__ = "2.1.0"
+__version__ = "2.2.0"
 
 console = Console()
 
@@ -70,7 +71,22 @@ INCOMPLETE = {".crdownload", ".part", ".tmp", ".download"}
 SKIPPED_EXTENSIONS = INCOMPLETE | {".lnk", ".url"}
 SYSTEM_FILES = {"desktop.ini", "thumbs.db"}
 
-USER_FOLDER_NAMES = ["Downloads", "Desktop", "Documents", "Pictures", "Videos", "Music"]
+# English and Dutch names of the personal folders. On Windows the real locations are
+# also asked from the system (see windows_known_folders), which works in every language.
+USER_FOLDER_NAMES = [
+    "Downloads", "Desktop", "Documents", "Pictures", "Videos", "Music",
+    "Bureaublad", "Documenten", "Afbeeldingen", "Video's", "Muziek",
+]
+
+# Windows "known folder" ids: Desktop, Documents, Downloads, Music, Pictures, Videos.
+KNOWN_FOLDER_IDS = [
+    "B4BFCC3A-DB2C-424C-B029-7FE99A87C641",
+    "FDD39AD0-238F-46AF-ADB4-6C85480369C7",
+    "374DE290-123F-4565-9164-39C4925E467B",
+    "4BD8D571-6D19-48D3-BE97-422220080E43",
+    "33E28130-4E1E-4676-835A-98395C3BC3BB",
+    "18989B1D-99B5-455B-841C-AB7C74E4DDFC",
+]
 
 # Folders that are never scanned (lowercase names): tooling, system and game/app data.
 SKIP_DIR_NAMES = {
@@ -79,6 +95,8 @@ SKIP_DIR_NAMES = {
     "my games", "saved games", "rockstar games", "electronic arts", "ubisoft",
     "steam", "epic games", "riot games", "windowspowershell", "powershell",
     "onenote notebooks", "custom office templates",
+    "my music", "my pictures", "my videos",
+    "mijn muziek", "mijn afbeeldingen", "mijn video's",
 }
 
 # A subfolder containing one of these files is a software project and is skipped completely.
@@ -137,20 +155,59 @@ def is_protected(folder: Path) -> bool:
     return any(part.lower() in PROTECTED_NAMES for part in resolved.parts)
 
 
+def windows_known_folders() -> list[Path]:
+    """Ask Windows where Desktop, Documents, Downloads, Music, Pictures and Videos really are."""
+    if os.name != "nt":
+        return []
+    try:
+        import ctypes
+
+        get_path = ctypes.windll.shell32.SHGetKnownFolderPath
+        get_path.restype = ctypes.c_long
+        get_path.argtypes = [
+            ctypes.c_char_p,
+            ctypes.c_uint32,
+            ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_wchar_p),
+        ]
+        free = ctypes.windll.ole32.CoTaskMemFree
+        free.argtypes = [ctypes.c_void_p]
+    except (AttributeError, OSError):
+        return []
+
+    folders: list[Path] = []
+    for guid in KNOWN_FOLDER_IDS:
+        try:
+            buffer = ctypes.c_wchar_p()
+            result = get_path(UUID(guid).bytes_le, 0, None, ctypes.byref(buffer))
+            if result == 0 and buffer.value:
+                folders.append(Path(buffer.value))
+            free(ctypes.cast(buffer, ctypes.c_void_p))
+        except (OSError, ValueError):
+            continue
+    return folders
+
+
 def user_folders() -> list[Path]:
-    """Personal folders (Downloads, Documents, ...), including OneDrive-redirected ones."""
+    """Personal folders in any language, including OneDrive-redirected ones."""
     home = Path.home()
+    home_real = home.resolve()
+    candidates = windows_known_folders()
     bases = [home] + [p for p in sorted(home.glob("OneDrive*")) if p.is_dir()]
-    found: list[Path] = []
-    seen: set[Path] = set()
     for base in bases:
-        for name in USER_FOLDER_NAMES:
-            candidate = base / name
-            if candidate.is_dir():
-                real = candidate.resolve()
-                if real not in seen:
-                    seen.add(real)
-                    found.append(candidate)
+        candidates.extend(base / name for name in USER_FOLDER_NAMES)
+
+    found: list[Path] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        if not candidate.is_dir():
+            continue
+        real = candidate.resolve()
+        key = os.path.normcase(str(real))
+        if real == home_real or key in seen:
+            continue
+        seen.add(key)
+        found.append(candidate)
     return found
 
 
@@ -602,7 +659,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "-a", "--all", action="store_true",
-        help="process all personal folders: Downloads, Desktop, Documents, Pictures, Videos, Music",
+        help="process all personal folders (Downloads, Desktop, Documents, Pictures, Videos, Music), in any language",
     )
     parser.add_argument("-n", "--dry-run", action="store_true", help="only show what would happen")
     parser.add_argument("-u", "--undo", action="store_true", help="undo the last sorting run")

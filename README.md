@@ -16,7 +16,7 @@ Documents, Pictures, Videos, Music) from the terminal, with a colorful UI.
 ## Features
 
 - Sorts loose files into `Images`, `Audio`, `Video`, `Documents`, `Code`, ... by extension
-- `--all`: works on all your personal folders at once
+- - `--all`: works on all your personal folders at once, in any Windows language (Bureaublad, Documenten, Afbeeldingen, ...), including OneDrive-redirected ones
 - `--by-date`: sorts into `Category/YYYY/MM` subfolders
 - `--duplicates`: finds identical files (size, then SHA-256) and trashes the extra copies
 - `--older-than DAYS`: trashes files you have not touched for a long time
