@@ -16,10 +16,10 @@ if [ ! -d ".venv" ]; then
     $PY -m venv .venv
 fi
 
-if [ ! -f ".venv/.deps_v2" ]; then
+if ! cmp -s requirements.txt .venv/requirements.installed; then
     echo "Installing dependencies..."
     .venv/bin/python -m pip install -q -r requirements.txt
-    touch .venv/.deps_v2
+    cp requirements.txt .venv/requirements.installed
 fi
 
 RUN=".venv/bin/python downloads_sorter.py"

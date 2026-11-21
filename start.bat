@@ -15,11 +15,12 @@ if not exist ".venv\Scripts\python.exe" (
     if errorlevel 1 goto error
 )
 
-if not exist ".venv\.deps_v2" (
+fc /b requirements.txt ".venv\requirements.installed" >nul 2>nul
+if errorlevel 1 (
     echo Installing dependencies...
     ".venv\Scripts\python.exe" -m pip install -q -r requirements.txt
     if errorlevel 1 goto error
-    echo ok> ".venv\.deps_v2"
+    copy /y requirements.txt ".venv\requirements.installed" >nul
 )
 
 set PYX=.venv\Scripts\python.exe
