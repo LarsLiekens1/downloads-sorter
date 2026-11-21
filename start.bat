@@ -15,12 +15,14 @@ if not exist ".venv\Scripts\python.exe" (
     if errorlevel 1 goto error
 )
 
-if not exist ".venv\.deps_ok" (
+if not exist ".venv\.deps_v2" (
     echo Installing dependencies...
     ".venv\Scripts\python.exe" -m pip install -q -r requirements.txt
     if errorlevel 1 goto error
-    echo ok> ".venv\.deps_ok"
+    echo ok> ".venv\.deps_v2"
 )
+
+set PYX=.venv\Scripts\python.exe
 
 :menu
 cls
@@ -28,17 +30,33 @@ echo ==============================
 echo        DOWNLOADS SORTER
 echo ==============================
 echo.
-echo   [1] Preview (nothing is moved)
-echo   [2] Sort my Downloads folder
+echo   Downloads folder
+echo   [1] Preview sort
+echo   [2] Sort
 echo   [3] Undo the last sort
-echo   [4] Quit
+echo   [4] Trash files older than 30 days
 echo.
-set /p CHOICE=Choose 1-4: 
+echo   All personal folders (Downloads, Desktop, Documents, Pictures, Videos, Music)
+echo   [5] Preview sort
+echo   [6] Sort
+echo   [7] Find duplicates (preview)
+echo   [8] Remove duplicates
+echo   [9] Show the 20 largest files
+echo.
+echo   [0] Quit
+echo.
+set /p CHOICE=Choose 0-9: 
 
-if "%CHOICE%"=="1" ".venv\Scripts\python.exe" downloads_sorter.py --dry-run & goto again
-if "%CHOICE%"=="2" ".venv\Scripts\python.exe" downloads_sorter.py & goto again
-if "%CHOICE%"=="3" ".venv\Scripts\python.exe" downloads_sorter.py --undo & goto again
-if "%CHOICE%"=="4" exit /b 0
+if "%CHOICE%"=="1" %PYX% downloads_sorter.py --dry-run & goto again
+if "%CHOICE%"=="2" %PYX% downloads_sorter.py & goto again
+if "%CHOICE%"=="3" %PYX% downloads_sorter.py --undo & goto again
+if "%CHOICE%"=="4" %PYX% downloads_sorter.py --older-than 30 & goto again
+if "%CHOICE%"=="5" %PYX% downloads_sorter.py --all --dry-run & goto again
+if "%CHOICE%"=="6" %PYX% downloads_sorter.py --all & goto again
+if "%CHOICE%"=="7" %PYX% downloads_sorter.py --all --duplicates --dry-run & goto again
+if "%CHOICE%"=="8" %PYX% downloads_sorter.py --all --duplicates & goto again
+if "%CHOICE%"=="9" %PYX% downloads_sorter.py --all --top 20 & goto again
+if "%CHOICE%"=="0" exit /b 0
 goto menu
 
 :again

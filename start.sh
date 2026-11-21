@@ -16,11 +16,13 @@ if [ ! -d ".venv" ]; then
     $PY -m venv .venv
 fi
 
-if [ ! -f ".venv/.deps_ok" ]; then
+if [ ! -f ".venv/.deps_v2" ]; then
     echo "Installing dependencies..."
     .venv/bin/python -m pip install -q -r requirements.txt
-    touch .venv/.deps_ok
+    touch .venv/.deps_v2
 fi
+
+RUN=".venv/bin/python downloads_sorter.py"
 
 while true; do
     clear
@@ -28,17 +30,33 @@ while true; do
     echo "       DOWNLOADS SORTER"
     echo "=============================="
     echo
-    echo "  [1] Preview (nothing is moved)"
-    echo "  [2] Sort my Downloads folder"
+    echo "  Downloads folder"
+    echo "  [1] Preview sort"
+    echo "  [2] Sort"
     echo "  [3] Undo the last sort"
-    echo "  [4] Quit"
+    echo "  [4] Trash files older than 30 days"
     echo
-    read -r -p "Choose 1-4: " choice
+    echo "  All personal folders (Downloads, Desktop, Documents, Pictures, Videos, Music)"
+    echo "  [5] Preview sort"
+    echo "  [6] Sort"
+    echo "  [7] Find duplicates (preview)"
+    echo "  [8] Remove duplicates"
+    echo "  [9] Show the 20 largest files"
+    echo
+    echo "  [0] Quit"
+    echo
+    read -r -p "Choose 0-9: " choice
     case "$choice" in
-        1) .venv/bin/python downloads_sorter.py --dry-run ;;
-        2) .venv/bin/python downloads_sorter.py ;;
-        3) .venv/bin/python downloads_sorter.py --undo ;;
-        4) exit 0 ;;
+        1) $RUN --dry-run ;;
+        2) $RUN ;;
+        3) $RUN --undo ;;
+        4) $RUN --older-than 30 ;;
+        5) $RUN --all --dry-run ;;
+        6) $RUN --all ;;
+        7) $RUN --all --duplicates --dry-run ;;
+        8) $RUN --all --duplicates ;;
+        9) $RUN --all --top 20 ;;
+        0) exit 0 ;;
         *) continue ;;
     esac
     echo
